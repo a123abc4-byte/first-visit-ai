@@ -33,13 +33,12 @@
         textarea { resize: vertical; }
         .btn-primary { background-color: #27ae60; color: white; width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .btn-primary:hover { background-color: #219150; }
-        .btn-secondary { background-color: #3498db; color: white; padding: 8px 15px; font-size: 13px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .btn-secondary:hover { background-color: #2980b9; }
         .btn-copy { background-color: #e67e22; color: white; padding: 8px 15px; font-size: 13px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; float: right; margin-top: 5px; }
         .btn-copy:hover { background-color: #d35400; }
         details { margin-top: 10px; font-size: 13px; color: #666; }
         details summary { cursor: pointer; font-weight: bold; color: #555; }
         .template-box { margin-top: 10px; }
+        .saved-badge { font-size: 11px; color: #27ae60; margin-left: 5px; display: none; }
     </style>
 </head>
 <body>
@@ -60,24 +59,27 @@
 
     <!-- 1. 기본 설정 -->
     <div class="section">
-        <div class="section-title">🔑 기본 설정 (브라우저 자동 저장)</div>
-        <label for="apiKey">Google Gemini API Key</label>
-        <input type="password" id="apiKey" placeholder="AI Studio에서 발급받은 API 키를 입력하세요">
+        <div class="section-title">
+            🔑 기본 설정 
+            <span id="savedBadge" class="saved-badge">✓ API 키 자동 저장됨</span>
+        </div>
+        <label for="apiKey">Google Gemini API Key (입력시 자동 저장됩니다)</label>
+        <!-- oninput 이벤트로 입력하자마자 바로 자동저장 -->
+        <input type="password" id="apiKey" placeholder="AI Studio에서 발급받은 API 키를 입력하세요" oninput="autoSaveApiKey()">
         
         <details>
             <summary>📁 카테고리별 예시 문구 설정 (접기/펼치기)</summary>
             <div class="template-box">
                 <label>자동차보험 예시문 (전체 데이터)</label>
-                <textarea id="tplCar" rows="5" placeholder="자동차보험 txt 내용"></textarea>
+                <textarea id="tplCar" rows="5" oninput="autoSaveTemplates()"></textarea>
                 
                 <label>다이어트 예시문 (전체 데이터)</label>
-                <textarea id="tplDiet" rows="5" placeholder="다이어트 txt 내용"></textarea>
+                <textarea id="tplDiet" rows="5" oninput="autoSaveTemplates()"></textarea>
                 
                 <label>일반통증 예시문 (전체 데이터)</label>
-                <textarea id="tplPain" rows="5" placeholder="일반통증 txt 내용"></textarea>
+                <textarea id="tplPain" rows="5" oninput="autoSaveTemplates()"></textarea>
             </div>
         </details>
-        <button class="btn-secondary" onclick="saveSettings()" style="margin-top: 10px;">💾 설정 저장하기</button>
     </div>
 
     <!-- 2. 환자 정보 입력 -->
@@ -111,7 +113,7 @@
     // ==========================================
     // 🔑 1. 접속 비밀번호 설정
     // ==========================================
-    const APP_PASSWORD = "818-1575-a"; // 원하시는 접속 비밀번호로 변경하세요!
+    const APP_PASSWORD = "818-1575-a"; // 원하시는 비밀번호로 수정 가능
 
     // ==========================================
     // 📄 2. 카테고리별 원본 전체 데이터
@@ -439,7 +441,7 @@
 
 장시간 앉거나 허리에 부담 주는 동작은 피하시는게 좋고 밤에 잠을 주무실 때 똑바로 누워서 허리가 불편하면 무릎 아래 쿠션을 넣어서 허리의 부담을 줄여주는게 좋습니다. 
 
-바른시선한의원은 이인경님의 건강한 일상 복귀를 위해 최선을 다해 돕겠습니다. 편한 밤 되세요! 감사합니다.
+바른시선한의원은 이인경님의 건강한 일상 복귀를 위해 최선을 다하겠습니다. 편한 밤 되세요! 감사합니다.
 
 ==================================================
 
@@ -458,7 +460,7 @@
         if (inputPw === APP_PASSWORD) {
             document.getElementById('loginOverlay').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
-            initSettings(); // 설정값 로드
+            initSettings(); // 로그인 성공 시 설정값 로드
         } else {
             alert('비밀번호가 올바르지 않습니다.');
             document.getElementById('accessPassword').value = '';
@@ -467,23 +469,37 @@
 
     // 설정 초기화 및 불러오기
     function initSettings() {
-        if (localStorage.getItem('gemini_api_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key');
+        // API 키 불러오기
+        const savedApiKey = localStorage.getItem('gemini_api_key');
+        if (savedApiKey) {
+            document.getElementById('apiKey').value = savedApiKey;
+            document.getElementById('savedBadge').style.display = 'inline';
         }
 
-        // 예시문구 불러오기 (수정 내역이 저장된 것이 없으면 기본 원본 전체 데이터 입력)
+        // 예시문구 불러오기 (없으면 원본 기본값 사용)
         document.getElementById('tplCar').value = localStorage.getItem('tpl_car') || DEFAULT_TEMPLATES.car;
         document.getElementById('tplDiet').value = localStorage.getItem('tpl_diet') || DEFAULT_TEMPLATES.diet;
         document.getElementById('tplPain').value = localStorage.getItem('tpl_pain') || DEFAULT_TEMPLATES.pain;
     }
 
-    // 설정 저장
-    function saveSettings() {
-        localStorage.setItem('gemini_api_key', document.getElementById('apiKey').value.trim());
+    // ⚡ API 키 타이핑/붙여넣기 즉시 자동 저장 함수
+    function autoSaveApiKey() {
+        const val = document.getElementById('apiKey').value.trim();
+        localStorage.setItem('gemini_api_key', val);
+        
+        const badge = document.getElementById('savedBadge');
+        if (val) {
+            badge.style.display = 'inline';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    // ⚡ 예시문 수정 시 자동 저장 함수
+    function autoSaveTemplates() {
         localStorage.setItem('tpl_car', document.getElementById('tplCar').value);
         localStorage.setItem('tpl_diet', document.getElementById('tplDiet').value);
         localStorage.setItem('tpl_pain', document.getElementById('tplPain').value);
-        alert("API 키와 카테고리별 전체 예시문이 브라우저에 정상 저장되었습니다!");
     }
 
     // AI 초진 인사 생성
@@ -493,7 +509,7 @@
         const memo = document.getElementById('memo').value.trim();
 
         if (!apiKey) {
-            alert("Google API Key를 입력 후 저장해 주세요.");
+            alert("Google API Key를 입력해 주세요. (1회 입력 시 자동 저장됩니다)");
             return;
         }
         if (!memo) {
@@ -547,7 +563,7 @@ ${memo}
             if (data.candidates && data.candidates[0].content.parts[0].text) {
                 resultArea.value = data.candidates[0].content.parts[0].text;
             } else {
-                alert("생성에 실패했습니다. API 키를 확인해 주세요.");
+                alert("생성에 실패했습니다. API 키가 올바른지 확인해 주세요.");
             }
         } catch (error) {
             alert("오류가 발생했습니다: " + error.message);
